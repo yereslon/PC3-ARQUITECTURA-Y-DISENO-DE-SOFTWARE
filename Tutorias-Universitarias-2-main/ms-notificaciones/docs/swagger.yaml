@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: MS Notificaciones API
+  version: 1.0.0
+  description: Contrato del endpoint HTTP de compatibilidad de notificaciones. El flujo principal vigente del servicio se procesa como worker RabbitMQ desde `notificaciones_email_queue`; el contrato de eventos se documentará por separado.
+servers:
+  - url: http://localhost:3003
+    description: Entorno local según configuración del servicio
+tags:
+  - name: Notificaciones
+    description: Endpoint HTTP de compatibilidad
+paths:
+  /notificaciones/{canal}:
+    post:
+      deprecated: true
+      tags:
+        - Notificaciones
+      summary: Envía una notificación por canal HTTP de compatibilidad
+      description: >-
+        Ruta Express de compatibilidad (`POST /notificaciones/:canal`). Para
+        `email`, valida `destinatario`, `asunto` y `cuerpo`, delega en el
+        proveedor de correo simulado y devuelve un log de envío. El canal `sms`
+        permanece definido pero no implementado.
+      operationId: postNotificacionLegacy
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: canal
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - email
+              - sms
+          example: email
+          description: Canal de notificación solicitado por la ruta HTTP de compatibilidad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificacionRequest'
+      responses:
+        '202':
+          description: Notificación aceptada y enviada por el proveedor simulado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionLog'
+        '400':
+          description: Faltan datos requeridos o el canal solicitado no es soportado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: El canal solicitado existe en el contrato pero no está implementado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno inesperado del servidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Identificador de correlación usado para trazabilidad operativa.
+  schemas:
+    NotificacionRequest:
+      type: object
+      required:
+        - destinatario
+        - asunto
+        - cuerpo
+      properties:
+        destinatario:
+          type: string
+          format: email
+          example: ana.torres@universidad.edu
+        asunto:
+          type: string
+          example: Tutoría confirmada
+        cuerpo:
+          type: string
+          example: Tu tutoría ha sido confirmada.
+    NotificacionLog:
+      type: object
+      properties:
+        logId:
+          type: string
+          format: uuid
+          example: 27f25bb9-2af4-41f8-9cf1-7c7c064f0d46
+        canal:
+          type: string
+          example: email
+        destinatario:
+          type: string
+          format: email
+          example: ana.torres@universidad.edu
+        timestamp:
+          type: string
+          format: date-time
+        estado:
+          type: string
+          example: ENVIADO
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: El canal 'sms' no está implementado.

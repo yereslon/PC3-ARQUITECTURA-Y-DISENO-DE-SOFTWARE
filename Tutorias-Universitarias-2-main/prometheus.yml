@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s # Escanear cada 5 segundos (agresivo para demos, 15s es normal)
+
+scrape_configs:
+  - job_name: 'tutorias_services'
+    static_configs:
+      - targets:
+        - 'ms-auth:4000'
+        - 'ms-usuarios:3001'
+        - 'ms-agenda:3002'
+        - 'ms-notificaciones:3003'
+        - 'ms-tutorias:3000'

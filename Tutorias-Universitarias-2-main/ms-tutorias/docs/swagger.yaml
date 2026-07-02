@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: MS Tutorías API
+  version: 1.0.0
+  description: Contrato mínimo del servicio orquestador que solicita tutorías mediante una Saga con validación de usuarios, bloqueo de agenda y publicación de notificación.
+servers:
+  - url: http://localhost:3000
+    description: Entorno local según configuración del servicio
+tags:
+  - name: Tutorías
+    description: Solicitud y confirmación de tutorías
+paths:
+  /tutorias:
+    post:
+      tags:
+        - Tutorías
+      summary: Solicita una tutoría
+      description: Requiere JWT Bearer. Solo usuarios con rol `student` pueden solicitar tutorías; el `idEstudiante` efectivo se toma del claim `sub` del token y no del cuerpo.
+      operationId: postTutoria
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudTutoriaRequest'
+            examples:
+              solicitud:
+                value:
+                  idTutor: t09876
+                  fechaSolicitada: '2025-06-25T15:00:00.000Z'
+                  duracionMinutos: 60
+                  materia: Cálculo Multivariable
+      responses:
+        '201':
+          description: Tutoría confirmada o actualizada al estado resultante del flujo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tutoria'
+        '401':
+          description: Token ausente, mal formado, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: El token es válido, pero el rol no está autorizado para solicitar tutorías.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Estudiante o tutor no encontrado durante la validación contra `ms-usuarios`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Horario no disponible o conflicto de reserva reportado por `ms-agenda`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: '`ms-usuarios` no disponible temporalmente por timeout, red o Circuit Breaker abierto.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno o fallo no controlado durante la orquestación/compensación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Identificador de correlación propagado a usuarios, agenda y eventos de tracking.
+  schemas:
+    SolicitudTutoriaRequest:
+      type: object
+      required:
+        - idTutor
+        - fechaSolicitada
+        - duracionMinutos
+        - materia
+      properties:
+        idTutor:
+          type: string
+          example: t09876
+        fechaSolicitada:
+          type: string
+          format: date-time
+          example: '2025-06-25T15:00:00.000Z'
+        duracionMinutos:
+          type: integer
+          minimum: 1
+          example: 60
+        materia:
+          type: string
+          example: Cálculo Multivariable
+      additionalProperties: true
+    Tutoria:
+      type: object
+      properties:
+        idtutoria:
+          type: integer
+          description: Identificador devuelto por PostgreSQL con nombre normalizado a minúsculas.
+          example: 101
+        idestudiante:
+          type: string
+          example: e12345
+        idtutor:
+          type: string
+          example: t09876
+        fecha:
+          type: string
+          format: date-time
+          example: '2025-06-25T15:00:00.000Z'
+        materia:
+          type: string
+          example: Cálculo Multivariable
+        estado:
+          type: string
+          enum:
+            - PENDIENTE
+            - CONFIRMADA
+            - FALLIDA
+          example: CONFIRMADA
+        error:
+          type: string
+          nullable: true
+          example: null
+      additionalProperties: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: 'No se pudo completar la solicitud: Horario no disponible'

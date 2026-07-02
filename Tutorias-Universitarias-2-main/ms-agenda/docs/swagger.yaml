@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: MS Agenda API
+  version: 1.0.0
+  description: Contrato mínimo del servicio que consulta disponibilidad, bloquea horarios y compensa bloqueos de agenda.
+servers:
+  - url: http://localhost:3002
+    description: Entorno local según configuración del servicio
+tags:
+  - name: Agenda
+    description: Disponibilidad y bloqueo de horarios
+paths:
+  /agenda/tutores/{id_tutor}/disponibilidad:
+    get:
+      tags:
+        - Agenda
+      summary: Verifica disponibilidad de un tutor
+      description: Evalúa si la fecha solicitada cae dentro de un bloqueo existente del tutor.
+      operationId: getDisponibilidadTutor
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id_tutor
+          in: path
+          required: true
+          schema:
+            type: string
+          example: t09876
+        - name: fechaHora
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          example: '2025-06-25T15:00:00.000Z'
+      responses:
+        '200':
+          description: Disponibilidad calculada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisponibilidadResponse'
+        '400':
+          description: Falta el parámetro requerido `fechaHora`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno o fallo de base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /agenda/tutores/{id_tutor}/bloquear:
+    post:
+      tags:
+        - Agenda
+      summary: Bloquea un horario de tutor
+      description: Crea un bloqueo para el tutor después de revalidar disponibilidad. La restricción única de base de datos también evita doble reserva y se traduce a `409 Conflict`.
+      operationId: postBloqueoTutor
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id_tutor
+          in: path
+          required: true
+          schema:
+            type: string
+          example: t09876
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloqueoRequest'
+      responses:
+        '201':
+          description: Bloqueo creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bloqueo'
+        '400':
+          description: Faltan `fechaInicio`, `duracionMinutos` o `idEstudiante`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: El horario solicitado ya está reservado o dejó de estar disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno o fallo de base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /agenda/bloqueos/{idBloqueo}:
+    delete:
+      tags:
+        - Agenda
+      summary: Elimina un bloqueo como compensación
+      description: Endpoint usado por la Saga de tutorías para liberar agenda si una etapa posterior falla.
+      operationId: deleteBloqueo
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: idBloqueo
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 27f25bb9-2af4-41f8-9cf1-7c7c064f0d46
+      responses:
+        '200':
+          description: Compensación completada. Si el bloqueo no existía, el servicio conserva el estado final deseado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompensacionResponse'
+        '500':
+          description: Error interno o fallo de base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Identificador de correlación usado para trazabilidad operativa.
+  schemas:
+    DisponibilidadResponse:
+      type: object
+      required:
+        - disponible
+      properties:
+        disponible:
+          type: boolean
+          example: true
+    BloqueoRequest:
+      type: object
+      required:
+        - fechaInicio
+        - duracionMinutos
+        - idEstudiante
+      properties:
+        fechaInicio:
+          type: string
+          format: date-time
+          example: '2025-06-25T15:00:00.000Z'
+        duracionMinutos:
+          type: integer
+          minimum: 1
+          example: 60
+        idEstudiante:
+          type: string
+          example: e12345
+    Bloqueo:
+      type: object
+      properties:
+        idBloqueo:
+          type: string
+          format: uuid
+          example: 27f25bb9-2af4-41f8-9cf1-7c7c064f0d46
+        idTutor:
+          type: string
+          example: t09876
+        fechaInicio:
+          type: string
+          format: date-time
+          example: '2025-06-25T15:00:00.000Z'
+        duracionMinutos:
+          type: integer
+          example: 60
+        idEstudiante:
+          type: string
+          example: e12345
+    CompensacionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Bloqueo compensado (eliminado)
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: El horario solicitado ya no está disponible.

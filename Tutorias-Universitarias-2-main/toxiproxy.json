@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ms-usuarios",
+    "listen": "0.0.0.0:8001",
+    "upstream": "ms-usuarios:3001",
+    "enabled": true
+  }
+]

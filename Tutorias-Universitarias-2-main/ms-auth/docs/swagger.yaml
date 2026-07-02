@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: MS Auth API
+  version: 1.0.0
+  description: Contrato mínimo del servicio de autenticación que emite tokens JWT para el caso Tutorías Universitarias.
+servers:
+  - url: http://localhost:4000
+    description: Entorno local según configuración del servicio
+tags:
+  - name: Auth
+    description: Autenticación y emisión de tokens
+paths:
+  /auth/token:
+    post:
+      tags:
+        - Auth
+      summary: Emite un token JWT
+      description: Valida credenciales de usuario demo y devuelve un `access_token` JWT cuando son correctas.
+      operationId: postAuthToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthTokenRequest'
+            examples:
+              estudiante:
+                summary: Credenciales de estudiante demo
+                value:
+                  username: ana.torres
+                  password: password_ana
+      responses:
+        '200':
+          description: Token emitido correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          description: Faltan `username` o `password` en el cuerpo de la petición.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Credenciales inválidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno no controlado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    AuthTokenRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: ana.torres
+        password:
+          type: string
+          format: password
+          example: password_ana
+    AuthTokenResponse:
+      type: object
+      required:
+        - access_token
+      properties:
+        access_token:
+          type: string
+          description: JWT firmado con claims `sub`, `name`, `role` e `iss`.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Credenciales inválidas

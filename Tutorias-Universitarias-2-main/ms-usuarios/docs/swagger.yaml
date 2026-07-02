@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: MS Usuarios API
+  version: 1.0.0
+  description: Contrato mínimo del servicio que consulta estudiantes y tutores desde la base de datos de usuarios.
+servers:
+  - url: http://localhost:3001
+    description: Entorno local según configuración del servicio
+tags:
+  - name: Usuarios
+    description: Consulta de perfiles académicos
+paths:
+  /usuarios/estudiantes/{id}:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtiene un estudiante por identificador
+      description: Devuelve la fila del estudiante encontrado en la tabla `estudiantes`.
+      operationId: getEstudianteById
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: e12345
+      responses:
+        '200':
+          description: Estudiante encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estudiante'
+        '404':
+          description: Estudiante no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno o base de datos de usuarios no inicializada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /usuarios/tutores/{id}:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtiene un tutor por identificador
+      description: Devuelve la fila del tutor encontrado en la tabla `tutores`.
+      operationId: getTutorById
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: t09876
+      responses:
+        '200':
+          description: Tutor encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tutor'
+        '404':
+          description: Tutor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno o base de datos de usuarios no inicializada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Identificador de correlación usado para trazabilidad operativa.
+  schemas:
+    Estudiante:
+      type: object
+      properties:
+        id:
+          type: string
+          example: e12345
+        nombrecompleto:
+          type: string
+          description: Nombre completo como puede venir desde PostgreSQL con columnas normalizadas a minúsculas.
+          example: Ana Torres
+        email:
+          type: string
+          format: email
+          example: ana.torres@universidad.edu
+        carrera:
+          type: string
+          example: Ingeniería de Software
+      additionalProperties: true
+    Tutor:
+      type: object
+      properties:
+        id:
+          type: string
+          example: t09876
+        nombrecompleto:
+          type: string
+          description: Nombre completo como puede venir desde PostgreSQL con columnas normalizadas a minúsculas.
+          example: Dra. Elena Solano
+        email:
+          type: string
+          format: email
+          example: elena.solano@universidad.edu
+        especialidad:
+          type: string
+          example: Cálculo Multivariable
+      additionalProperties: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Estudiante no encontrado
